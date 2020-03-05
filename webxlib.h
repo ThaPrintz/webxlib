@@ -1,10 +1,10 @@
 //extern WEBXLIB_API int nwebxlib;
 //WEBXLIB_API int fnwebxlib(void);
+#include <csocket.h>
 
 #include <map>
 #include <vector>
 #include <string>
-#include <csocket.h>
 
 #ifdef WEBXLIB_EXPORTS
 #define WEBXLIB_API __declspec(dllexport)
@@ -13,6 +13,10 @@
 #endif
 
 typedef int WEBXLIB_ENUM;
+
+/****************************************************
+webxlib::socket enums
+****************************************************/
 extern WEBXLIB_API WEBXLIB_ENUM TCPWEBSOCK;
 extern WEBXLIB_API WEBXLIB_ENUM UDPWEBSOCK;
 
@@ -26,6 +30,16 @@ extern WEBXLIB_API WEBXLIB_ENUM WEBSOCK_ERROR;
 extern WEBXLIB_API WEBXLIB_ENUM WEBSOCK_SUCCESS;
 extern WEBXLIB_API WEBXLIB_ENUM WEBSOCK_INVALID;
 
+/****************************************************
+webxlib::webqueue enums
+****************************************************/
+extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_BUSY;
+extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_WANTREAD;
+extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_WANTWRITE;
+extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_WANTCONNECT;
+extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_WANTACCEPT;
+extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_WANTSSLACCEPT;
+
 typedef struct websockdata
 {
 	const char* address;
@@ -36,7 +50,7 @@ typedef struct websockdata
 	WEBXLIB_ENUM secure;
 } websockdata;
 
-typedef WEBXLIB_API struct HTTP_packet
+typedef struct HTTP_packet
 {
 	const char* httpversion;
 	const char* responsecode;
@@ -57,6 +71,8 @@ public:
 	
 	class socket;
 	class webhook;
+	class webqueue;
+	class lockz;
 	
 	socket* NewWebsock(websockdata* data);
 	webhook* NewWebhookInterface();
@@ -116,3 +132,38 @@ protected:
 	std::map<std::string, void*> hooktable;
 };
 
+typedef struct qpair
+{
+	WEBXLIB_ENUM status;
+	webxlib::socket* client;
+
+	bool operator==(const qpair& other) { return client == other.client; };
+} qpair;
+
+class WEBXLIB_API webxlib::webqueue
+{
+public:
+	void PushQueue(qpair cl);
+	void PopQueue(const qpair& cl);
+
+	void UpdateStatus(qpair cl, WEBXLIB_ENUM status);
+	void ClearQueue();
+
+	int QueueCount();
+
+	std::vector<qpair> GetQueue();
+protected:
+	std::vector<qpair> webq;
+};
+
+class WEBXLIB_API webxlib::lockz
+{
+public:
+	lockz();
+	~lockz();
+
+	void Acquire();
+	void Release();
+protected:
+	CRITICAL_SECTION m_criticalSection;
+};

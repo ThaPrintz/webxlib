@@ -2,6 +2,7 @@
 #include <io.h>
 #include <chrono>
 #include <ctime>
+#include <algorithm>
 
 /************************************************
 webxlib::socket library enum defitions
@@ -18,6 +19,16 @@ WEBXLIB_ENUM HTTPSWEBSOCK	 = 5;
 WEBXLIB_ENUM WEBSOCK_ERROR	 = -1;
 WEBXLIB_ENUM WEBSOCK_SUCCESS = 1;
 WEBXLIB_ENUM WEBSOCK_INVALID = 0;
+
+/****************************************************
+webxlib::webqueue enums
+****************************************************/
+WEBXLIB_ENUM WEBCLIENT_BUSY			 = 0;
+WEBXLIB_ENUM WEBCLIENT_WANTREAD		 = 1;
+WEBXLIB_ENUM WEBCLIENT_WANTWRITE	 = 2;
+WEBXLIB_ENUM WEBCLIENT_WANTCONNECT	 = 3;
+WEBXLIB_ENUM WEBCLIENT_WANTACCEPT	 = 4;
+WEBXLIB_ENUM WEBCLIENT_WANTSSLACCEPT = 5;
 
 /************************************************
 webxlib::socket library funcs
@@ -137,6 +148,62 @@ void webxlib::webhook::CallWebhook(const char* id, void* param, void* param2)
 std::map<std::string, void*>* webxlib::webhook::GetHookTable()
 {
 	return &this->hooktable;
+}
+
+/************************************************
+webxlib::webqueue library funcs
+*************************************************/
+void  webxlib::webqueue::PushQueue(qpair cl)
+{
+	this->webq.push_back(cl);
+}
+
+void webxlib::webqueue::PopQueue(const qpair& cl)
+{
+	this->webq.erase(std::remove(this->webq.begin(), this->webq.end(), cl));
+}
+
+std::vector<qpair> webxlib::webqueue::GetQueue()
+{
+	return this->webq;
+}
+
+void webxlib::webqueue::UpdateStatus(qpair cl, WEBXLIB_ENUM status)
+{
+	cl.status = status;
+}
+
+int webxlib::webqueue::QueueCount()
+{
+	return this->webq.size();
+}
+
+void webxlib::webqueue::ClearQueue()
+{
+	this->webq.clear();
+}
+
+/************************************************
+webxlib::lockz library funcs
+*************************************************/
+webxlib::lockz::lockz()
+{
+	InitializeCriticalSection(&this->m_criticalSection);
+}
+
+webxlib::lockz::~lockz()
+{
+	DeleteCriticalSection(&this->m_criticalSection);
+}
+
+void webxlib::lockz::Acquire()
+{
+	EnterCriticalSection(&this->m_criticalSection);
+}
+
+void webxlib::lockz::Release()
+{
+	LeaveCriticalSection(&this->m_criticalSection);
 }
 
 /************************************************
