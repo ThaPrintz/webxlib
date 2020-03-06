@@ -65,10 +65,7 @@ typedef struct HTTP_packet
 
 class WEBXLIB_API webxlib 
 {
-public:
-	webxlib(std::string sv_name) 
-	{ server = sv_name; };
-	
+public:	
 	class socket;
 	class webhook;
 	class webqueue;
@@ -85,8 +82,6 @@ public:
 	uint8_t* LoadFiletoMem(char* filename, size_t* fsize);
 	bool fileExists(const char* filename);
 	char* systime();
-protected:
-	std::string server;
 };
 
 class WEBXLIB_API webxlib::socket
@@ -167,3 +162,5 @@ public:
 protected:
 	CRITICAL_SECTION m_criticalSection;
 };
+
+WEBXLIB_API webxlib* CreateWEBXInterface();

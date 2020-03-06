@@ -310,6 +310,11 @@ char* webxlib::systime()
 	return time;
 }
 
+webxlib* CreateWEBXInterface()
+{
+	return new webxlib();
+}
+
 std::map<std::string, std::string> webxlib::GetMimetypesTable()
 {
 	std::map<std::string, std::string> autotype;
