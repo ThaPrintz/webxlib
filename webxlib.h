@@ -105,7 +105,7 @@ public:
 	bool IsSecure();
 	int SelectReadable(const timeval timeout);
 	int SelectWriteable(const timeval timeout);
-	void SetSecure();
+	void SetSecure(bool opt);
 	int SetSockOpt(int lvl, int optname, const char* optval, int optlen);
 	int IOCtrlSock(long cmd, u_long* argp);
 

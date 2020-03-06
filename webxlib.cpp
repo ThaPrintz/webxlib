@@ -113,9 +113,13 @@ int webxlib::socket::SelectWriteable(const timeval timeout)
 	return this->websock->SelectWriteable(timeout);
 }
 
-void webxlib::socket::SetSecure()
+void webxlib::socket::SetSecure(bool opt)
 {
-	this->websock->SetSecure();
+	if (opt) {
+		this->websock->SetSecure(true);
+	} else {
+		this->websock->SetSecure(false);
+	}
 
 	return;
 }
