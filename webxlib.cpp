@@ -98,6 +98,11 @@ bool webxlib::socket::IsValid()
 	return this->websock->IsValid();
 }
 
+bool webxlib::socket::IsSecure()
+{
+	return this->websock->isSecure();
+}
+
 int webxlib::socket::SelectReadable(const timeval timeout)
 {
 	return this->websock->SelectReadable(timeout);
@@ -106,6 +111,13 @@ int webxlib::socket::SelectReadable(const timeval timeout)
 int webxlib::socket::SelectWriteable(const timeval timeout)
 {
 	return this->websock->SelectWriteable(timeout);
+}
+
+void webxlib::socket::SetSecure()
+{
+	this->websock->SetSecure();
+
+	return;
 }
 
 int webxlib::socket::SetSockOpt(int lvl, int optname, const char* optval, int optlen)

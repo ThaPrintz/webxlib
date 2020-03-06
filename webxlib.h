@@ -102,10 +102,13 @@ public:
 	int SSLWantWrite();
 
 	bool IsValid();
+	bool IsSecure();
 	int SelectReadable(const timeval timeout);
 	int SelectWriteable(const timeval timeout);
+	void SetSecure();
 	int SetSockOpt(int lvl, int optname, const char* optval, int optlen);
 	int IOCtrlSock(long cmd, u_long* argp);
+
 
 	int Send(const char* data, int sz);
 	int Recv(char* data, int sz);
