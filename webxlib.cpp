@@ -7,18 +7,18 @@
 /************************************************
 webxlib::socket library enum defitions
 *************************************************/
-WEBXLIB_ENUM TCPWEBSOCK		 = 0;
-WEBXLIB_ENUM UDPWEBSOCK		 = 1;
+WEBXLIB_ENUM TCPWEBSOCK		 = CSOCKET_TCP;
+WEBXLIB_ENUM UDPWEBSOCK		 = CSOCKET_UDP;
 
-WEBXLIB_ENUM IPV4WEBSOCK	 = 2;
-WEBXLIB_ENUM IPV6WEBSOCK	 = 3;
+WEBXLIB_ENUM IPV4WEBSOCK	 = CSOCKET_IPV4;
+WEBXLIB_ENUM IPV6WEBSOCK	 = CSOCKET_IPV6;
 
-WEBXLIB_ENUM HTTPWEBSOCK	 = 4;
-WEBXLIB_ENUM HTTPSWEBSOCK	 = 5;
+WEBXLIB_ENUM HTTPWEBSOCK	 = CSOCKET_HTTP;
+WEBXLIB_ENUM HTTPSWEBSOCK	 = CSOCKET_HTTPS;
 
-WEBXLIB_ENUM WEBSOCK_ERROR	 = -1;
-WEBXLIB_ENUM WEBSOCK_SUCCESS = 1;
-WEBXLIB_ENUM WEBSOCK_INVALID = 0;
+WEBXLIB_ENUM WEBSOCK_ERROR	 = CSOCKET_FATAL_ERROR;
+WEBXLIB_ENUM WEBSOCK_SUCCESS = CSOCKET_SOCK_SUCCESS;
+WEBXLIB_ENUM WEBSOCK_INVALID = CSOCKET_INVALID_SOCKET;
 
 /****************************************************
 webxlib::webqueue enums
@@ -33,9 +33,9 @@ WEBXLIB_ENUM WEBCLIENT_WANTSSLACCEPT = 5;
 /************************************************
 webxlib::socket library funcs
 *************************************************/
-webxlib::socket::socket(websockdata* data)
+webxlib::socket::socket(csockdata* data)
 {
-	this->websock = new CSOCKET((csockdata*)data);
+	this->websock = new CSOCKET(data);
 }
 
 webxlib::socket::socket(CSOCKET* cl)
@@ -225,7 +225,7 @@ void webxlib::lockz::Release()
 /************************************************
 webxlib interface funcs
 *************************************************/
-webxlib::socket* webxlib::NewWebsock(websockdata* data)
+webxlib::socket* webxlib::NewWebsock(csockdata* data)
 {
 	return new webxlib::socket(data);
 }

@@ -40,16 +40,6 @@ extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_WANTCONNECT;
 extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_WANTACCEPT;
 extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_WANTSSLACCEPT;
 
-typedef struct websockdata
-{
-	const char* address;
-	const char* port;
-
-	WEBXLIB_ENUM dataprotocol;
-	WEBXLIB_ENUM ipprotocol;
-	WEBXLIB_ENUM secure;
-} websockdata;
-
 typedef struct HTTP_packet
 {
 	const char* httpversion;
@@ -71,7 +61,7 @@ public:
 	class webqueue;
 	class lockz;
 	
-	socket* NewWebsock(websockdata* data);
+	socket* NewWebsock(csockdata* data);
 	webhook* NewWebhookInterface();
 
 	std::map<std::string, std::string> ParseHTTPRequest(char* data);
@@ -87,7 +77,7 @@ public:
 class WEBXLIB_API webxlib::socket
 {
 public:
-	socket(websockdata*);
+	socket(csockdata*);
 	~socket();
 
 	int Bind();
