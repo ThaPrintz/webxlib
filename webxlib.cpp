@@ -148,22 +148,21 @@ int webxlib::socket::Recv(char* data, int sz)
 webxlib::webhook library funcs
 *************************************************/
 
-//catalyst function
-static void _default(void* ptr, void* pParam);
-
-void webxlib::webhook::RegisterWebhook(const char* id, void* ptr)
+void webxlib::webhook::RegisterWebhook(std::string id, void* ptr)
 {
 	this->hooktable[id] = ptr;
 }
 
-void webxlib::webhook::CallWebhook(const char* id, void* param, void* param2)
+void webxlib::webhook::CallWebhook(std::string id, void* param, void* param2)
 {
-	(decltype(&_default)(this->hooktable[id]))(param, param2);
+	(decltype(&this->_catalyst)(this->hooktable[id]))(param, param2);
 }
 
-std::map<std::string, void*>* webxlib::webhook::GetHookTable()
+bool webxlib::webhook::hookIsValid(std::string id)
 {
-	return &this->hooktable;
+	auto it = this->hooktable.find(id);
+
+	return it != this->hooktable.end();
 }
 
 /************************************************
@@ -237,7 +236,7 @@ webxlib::webhook* webxlib::NewWebhookInterface()
 
 std::map<std::string, std::string> webxlib::ParseHTTPRequest(char* data)
 {
-	auto buff = stringExp(data, '\r\n');
+	auto buff = stringExp(data, (char)'\r\n');
 	auto reqs = stringExp(buff[0], ' ');
 
 	std::map<std::string, std::string> ret;
@@ -270,13 +269,12 @@ std::map<std::string, std::string> webxlib::ParseHTTPRequest(char* data)
 
 std::string webxlib::BuildResponsePacket(HTTP_packet sv)
 {
-	return sv.httpversion + std::string(" ") + sv.responsecode + "\r\n"
-		+ sv.server + "\r\n"
+	return "HTTP/1.1 " + sv.responsecode + "\r\n"
+		+ "Server: " + sv.server + "\r\n"
 		+ "Date: " + systime() + "\r\n"
-		+ sv.content_security_policy + "\r\n"
 		+ "Content-Length: " + sv.content_length + "\r\n"
 		+ "Content-Type: " + sv.content_type + "\r\n"
-		+ "Connection:" + sv.connection + "\r\n\r\n"
+		+ "Connection: " + sv.connection + "\r\n\r\n"
 		+ sv.response_content;
 }
 

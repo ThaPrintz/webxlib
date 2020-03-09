@@ -42,15 +42,13 @@ extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_WANTSSLACCEPT;
 
 typedef struct HTTP_packet
 {
-	const char* httpversion;
-	const char* responsecode;
-	const char* server;
-	const char* date;
-	const char* content_security_policy = "Content-Security-Policy: default-src 'self'\r\n";
-	const char* content_length;
-	const char* content_type;
-	const char* connection;
-	char* response_content;
+	std::string responsecode;
+	std::string server;
+	std::string date;
+	std::string content_length;
+	std::string content_type;
+	std::string connection;
+	std::string response_content;
 } HTTP_packet;
 
 class WEBXLIB_API webxlib 
@@ -112,11 +110,13 @@ protected:
 class WEBXLIB_API webxlib::webhook
 {
 public:
-	void RegisterWebhook(const char* id, void* funcptr);
-	void CallWebhook(const char* id, void* param, void* param2);
+	void RegisterWebhook(std::string id, void* funcptr);
+	void CallWebhook(std::string id, void* param, void* param2);
 
-	std::map<std::string, void*>* GetHookTable();
+	bool hookIsValid(std::string id);
 protected:
+	static void _catalyst(void* pParam, void* pparam2);
+
 	std::map<std::string, void*> hooktable;
 };
 
