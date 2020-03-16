@@ -11,30 +11,14 @@
 typedef int WEBXLIB_ENUM;
 
 /****************************************************
-webxlib::socket enums
-****************************************************/
-WEBXLIB_ENUM TCPWEBSOCK			= CSOCKET_TCP;
-WEBXLIB_ENUM UDPWEBSOCK			= CSOCKET_UDP;
-
-WEBXLIB_ENUM IPV4WEBSOCK		= CSOCKET_IPV4;
-WEBXLIB_ENUM IPV6WEBSOCK		= CSOCKET_IPV6;
-
-WEBXLIB_ENUM SIMPLEWEBSOCK		= CSOCKET_SIMPLE;
-WEBXLIB_ENUM SSLWEBSOCK			= CSOCKET_SSL;
-
-WEBXLIB_ENUM WEBSOCK_ERROR		= CSOCKET_FATAL_ERROR;
-WEBXLIB_ENUM WEBSOCK_SUCCESS	= CSOCKET_SOCK_SUCCESS;
-WEBXLIB_ENUM WEBSOCK_INVALID	= CSOCKET_INVALID_SOCKET;
-
-/****************************************************
 webxlib::webqueue enums & datastruct
-****************************************************/
+****************************************************
 WEBXLIB_ENUM WEBCLIENT_BUSY				= 0;
 WEBXLIB_ENUM WEBCLIENT_WANTREAD			= 1;
 WEBXLIB_ENUM WEBCLIENT_WANTWRITE		= 2;
 WEBXLIB_ENUM WEBCLIENT_WANTCONNECT		= 3;
 WEBXLIB_ENUM WEBCLIENT_WANTACCEPT		= 4;
-WEBXLIB_ENUM WEBCLIENT_WANTSSLACCEPT	= 5;
+WEBXLIB_ENUM WEBCLIENT_WANTSSLACCEPT	= 5;*/
 
 typedef struct HTTP_packet
 {
@@ -66,6 +50,19 @@ public:
 	uint8_t* LoadFiletoMem(char* filename, size_t* fsize);
 	bool fileExists(const char* filename);
 	char* systime();
+
+	static const WEBXLIB_ENUM TCPWEBSOCK		= CSOCKET::CSOCKET_TCP;
+	static const WEBXLIB_ENUM UDPWEBSOCK		= CSOCKET::CSOCKET_UDP;
+
+	static const WEBXLIB_ENUM IPV4WEBSOCK		= CSOCKET::CSOCKET_IPV4;
+	static const WEBXLIB_ENUM IPV6WEBSOCK		= CSOCKET::CSOCKET_IPV6;
+
+	static const WEBXLIB_ENUM SIMPLEWEBSOCK		= CSOCKET::CSOCKET_SIMPLE;
+	static const WEBXLIB_ENUM SSLWEBSOCK		= CSOCKET::CSOCKET_SSL;
+
+	static const WEBXLIB_ENUM WEBSOCK_ERROR		= CSOCKET::CSOCKET_FATAL_ERROR;
+	static const WEBXLIB_ENUM WEBSOCK_SUCCESS	= CSOCKET::CSOCKET_SOCK_SUCCESS;
+	static const WEBXLIB_ENUM WEBSOCK_INVALID	= CSOCKET::CSOCKET_INVALID_SOCKET;
 };
 
 typedef struct qpair
@@ -152,10 +149,5 @@ public:
 protected:
 	CRITICAL_SECTION m_criticalSection;
 };
-
-webxlib* CreateWEBXInterface()
-{
-	return new webxlib();
-}
 
 #endif //WEBXLIB_H
