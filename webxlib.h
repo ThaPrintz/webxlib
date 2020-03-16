@@ -1,44 +1,40 @@
-//extern WEBXLIB_API int nwebxlib;
-//WEBXLIB_API int fnwebxlib(void);
-#include <csocket.h>
+#define WIN32_LEAN_AND_MEAN
+#include <libcsock.h>
 
+#include <string>
 #include <map>
 #include <vector>
-#include <string>
 
-#ifdef WEBXLIB_EXPORTS
-#define WEBXLIB_API __declspec(dllexport)
-#else
-#define WEBXLIB_API __declspec(dllimport)
-#endif
+#ifndef WEBXLIB_H
+#define WEBXLIB_H
 
 typedef int WEBXLIB_ENUM;
 
 /****************************************************
 webxlib::socket enums
 ****************************************************/
-extern WEBXLIB_API WEBXLIB_ENUM TCPWEBSOCK;
-extern WEBXLIB_API WEBXLIB_ENUM UDPWEBSOCK;
+WEBXLIB_ENUM TCPWEBSOCK			= CSOCKET_TCP;
+WEBXLIB_ENUM UDPWEBSOCK			= CSOCKET_UDP;
 
-extern WEBXLIB_API WEBXLIB_ENUM IPV4WEBSOCK;
-extern WEBXLIB_API WEBXLIB_ENUM IPV6WEBSOCK;
+WEBXLIB_ENUM IPV4WEBSOCK		= CSOCKET_IPV4;
+WEBXLIB_ENUM IPV6WEBSOCK		= CSOCKET_IPV6;
 
-extern WEBXLIB_API WEBXLIB_ENUM HTTPWEBSOCK;
-extern WEBXLIB_API WEBXLIB_ENUM HTTPSWEBSOCK;
+WEBXLIB_ENUM SIMPLEWEBSOCK		= CSOCKET_SIMPLE;
+WEBXLIB_ENUM SSLWEBSOCK			= CSOCKET_SSL;
 
-extern WEBXLIB_API WEBXLIB_ENUM WEBSOCK_ERROR;
-extern WEBXLIB_API WEBXLIB_ENUM WEBSOCK_SUCCESS;
-extern WEBXLIB_API WEBXLIB_ENUM WEBSOCK_INVALID;
+WEBXLIB_ENUM WEBSOCK_ERROR		= CSOCKET_FATAL_ERROR;
+WEBXLIB_ENUM WEBSOCK_SUCCESS	= CSOCKET_SOCK_SUCCESS;
+WEBXLIB_ENUM WEBSOCK_INVALID	= CSOCKET_INVALID_SOCKET;
 
 /****************************************************
-webxlib::webqueue enums
+webxlib::webqueue enums & datastruct
 ****************************************************/
-extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_BUSY;
-extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_WANTREAD;
-extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_WANTWRITE;
-extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_WANTCONNECT;
-extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_WANTACCEPT;
-extern WEBXLIB_API WEBXLIB_ENUM WEBCLIENT_WANTSSLACCEPT;
+WEBXLIB_ENUM WEBCLIENT_BUSY				= 0;
+WEBXLIB_ENUM WEBCLIENT_WANTREAD			= 1;
+WEBXLIB_ENUM WEBCLIENT_WANTWRITE		= 2;
+WEBXLIB_ENUM WEBCLIENT_WANTCONNECT		= 3;
+WEBXLIB_ENUM WEBCLIENT_WANTACCEPT		= 4;
+WEBXLIB_ENUM WEBCLIENT_WANTSSLACCEPT	= 5;
 
 typedef struct HTTP_packet
 {
@@ -51,14 +47,14 @@ typedef struct HTTP_packet
 	std::string response_content;
 } HTTP_packet;
 
-class WEBXLIB_API webxlib 
+class webxlib
 {
-public:	
+public:
 	class socket;
 	class webhook;
 	class webqueue;
 	class lockz;
-	
+
 	socket* NewWebsock(csockdata* data);
 	webhook* NewWebhookInterface();
 
@@ -72,7 +68,15 @@ public:
 	char* systime();
 };
 
-class WEBXLIB_API webxlib::socket
+typedef struct qpair
+{
+	WEBXLIB_ENUM status;
+	webxlib::socket* client;
+
+	bool operator==(const qpair& other) { return client == other.client; };
+} qpair;
+
+class webxlib::socket
 {
 public:
 	socket(csockdata*);
@@ -86,14 +90,15 @@ public:
 	int SSLInit(const char* cert, const char* key);
 	int SSLBind();
 	int SSLAccept();
+	int SSLConnect();
 	int SSLWantRead();
 	int SSLWantWrite();
 
 	bool IsValid();
-	bool IsSecure();
+	int CheckType();
 	int SelectReadable(const timeval timeout);
 	int SelectWriteable(const timeval timeout);
-	void SetSecure(bool opt);
+	void SetType(WEBXLIB_ENUM type);
 	int SetSockOpt(int lvl, int optname, const char* optval, int optlen);
 	int IOCtrlSock(long cmd, u_long* argp);
 
@@ -107,7 +112,7 @@ protected:
 	CSOCKET* websock = nullptr;
 };
 
-class WEBXLIB_API webxlib::webhook
+class webxlib::webhook
 {
 public:
 	void RegisterWebhook(std::string id, void* funcptr);
@@ -120,15 +125,7 @@ protected:
 	std::map<std::string, void*> hooktable;
 };
 
-typedef struct qpair
-{
-	WEBXLIB_ENUM status;
-	webxlib::socket* client;
-
-	bool operator==(const qpair& other) { return client == other.client; };
-} qpair;
-
-class WEBXLIB_API webxlib::webqueue
+class webxlib::webqueue
 {
 public:
 	void PushQueue(qpair cl);
@@ -144,7 +141,7 @@ protected:
 	std::vector<qpair> webq;
 };
 
-class WEBXLIB_API webxlib::lockz
+class webxlib::lockz
 {
 public:
 	lockz();
@@ -156,4 +153,9 @@ protected:
 	CRITICAL_SECTION m_criticalSection;
 };
 
-WEBXLIB_API webxlib* CreateWEBXInterface();
+webxlib* CreateWEBXInterface()
+{
+	return new webxlib();
+}
+
+#endif //WEBXLIB_H

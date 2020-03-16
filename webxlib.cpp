@@ -1,34 +1,9 @@
 #include "webxlib.h"
+
 #include <io.h>
 #include <chrono>
 #include <ctime>
 #include <algorithm>
-
-/************************************************
-webxlib::socket library enum defitions
-*************************************************/
-WEBXLIB_ENUM TCPWEBSOCK		 = CSOCKET_TCP;
-WEBXLIB_ENUM UDPWEBSOCK		 = CSOCKET_UDP;
-
-WEBXLIB_ENUM IPV4WEBSOCK	 = CSOCKET_IPV4;
-WEBXLIB_ENUM IPV6WEBSOCK	 = CSOCKET_IPV6;
-
-WEBXLIB_ENUM HTTPWEBSOCK	 = CSOCKET_HTTP;
-WEBXLIB_ENUM HTTPSWEBSOCK	 = CSOCKET_HTTPS;
-
-WEBXLIB_ENUM WEBSOCK_ERROR	 = CSOCKET_FATAL_ERROR;
-WEBXLIB_ENUM WEBSOCK_SUCCESS = CSOCKET_SOCK_SUCCESS;
-WEBXLIB_ENUM WEBSOCK_INVALID = CSOCKET_INVALID_SOCKET;
-
-/****************************************************
-webxlib::webqueue enums
-****************************************************/
-WEBXLIB_ENUM WEBCLIENT_BUSY			 = 0;
-WEBXLIB_ENUM WEBCLIENT_WANTREAD		 = 1;
-WEBXLIB_ENUM WEBCLIENT_WANTWRITE	 = 2;
-WEBXLIB_ENUM WEBCLIENT_WANTCONNECT	 = 3;
-WEBXLIB_ENUM WEBCLIENT_WANTACCEPT	 = 4;
-WEBXLIB_ENUM WEBCLIENT_WANTSSLACCEPT = 5;
 
 /************************************************
 webxlib::socket library funcs
@@ -68,6 +43,11 @@ int webxlib::socket::Connect()
 	return this->websock->Connect();
 }
 
+int webxlib::socket::SSLConnect()
+{
+	return this->websock->SSLConnect();
+}
+
 int webxlib::socket::SSLInit(const char* cert, const char* key)
 {
 	return this->websock->SSL_Init(cert, key);
@@ -75,7 +55,7 @@ int webxlib::socket::SSLInit(const char* cert, const char* key)
 
 int webxlib::socket::SSLBind()
 {
-	return this->websock->SSLBindSocket();
+	return this->websock->SSLBind();
 }
 
 int webxlib::socket::SSLAccept()
@@ -98,9 +78,9 @@ bool webxlib::socket::IsValid()
 	return this->websock->IsValid();
 }
 
-bool webxlib::socket::IsSecure()
+int webxlib::socket::CheckType()
 {
-	return this->websock->isSecure();
+	return this->websock->CheckType();
 }
 
 int webxlib::socket::SelectReadable(const timeval timeout)
@@ -113,13 +93,9 @@ int webxlib::socket::SelectWriteable(const timeval timeout)
 	return this->websock->SelectWriteable(timeout);
 }
 
-void webxlib::socket::SetSecure(bool opt)
+void webxlib::socket::SetType(WEBXLIB_ENUM type)
 {
-	if (opt) {
-		this->websock->SetSecure(true);
-	} else {
-		this->websock->SetSecure(false);
-	}
+	this->websock->SetType(type);
 
 	return;
 }
@@ -240,9 +216,9 @@ std::map<std::string, std::string> webxlib::ParseHTTPRequest(char* data)
 	auto reqs = stringExp(buff[0], ' ');
 
 	std::map<std::string, std::string> ret;
-	ret["METHOD"]	= reqs[0];
-	ret["DATA"]		= reqs[1];
-	ret["VERSION"]  = reqs[2];
+	ret["METHOD"] = reqs[0];
+	ret["DATA"] = reqs[1];
+	ret["VERSION"] = reqs[2];
 
 	std::vector<std::string> lines;
 	for (int i = 0; i <= buff.size() - 3; i++) {
@@ -322,11 +298,6 @@ char* webxlib::systime()
 	time[strlen(time)] = '\0';
 
 	return time;
-}
-
-webxlib* CreateWEBXInterface()
-{
-	return new webxlib();
 }
 
 std::map<std::string, std::string> webxlib::GetMimetypesTable()
