@@ -1,25 +1,48 @@
-#define WIN32_LEAN_AND_MEAN
-#include <libcsock.h>
+#pragma once
+#define WIN32_LEAN_AND_MEAN  
+
+#ifndef WEBXLIB_H
+#define WEBXLIB_H
+
+#include <ws2tcpip.h>
+#include "wolfssl/ssl.h"
 
 #include <string>
 #include <map>
 #include <vector>
 
-#ifndef WEBXLIB_H
-#define WEBXLIB_H
+/**********************************************************
+webxlib::webxsock enums, return types & data structures
+***********************************************************/
+enum WEBXSOCK_PROPERTY
+{
+	TCPSOCK			= 0,
+	UDPSOCK			= 1,
 
-typedef int WEBXLIB_ENUM;
+	IPV4SOCK		= 2,
+	IPV6SOCK		= 3,
 
-/****************************************************
-webxlib::webqueue enums & datastruct
-****************************************************
-WEBXLIB_ENUM WEBCLIENT_BUSY				= 0;
-WEBXLIB_ENUM WEBCLIENT_WANTREAD			= 1;
-WEBXLIB_ENUM WEBCLIENT_WANTWRITE		= 2;
-WEBXLIB_ENUM WEBCLIENT_WANTCONNECT		= 3;
-WEBXLIB_ENUM WEBCLIENT_WANTACCEPT		= 4;
-WEBXLIB_ENUM WEBCLIENT_WANTSSLACCEPT	= 5;*/
+	STANDARDSOCK	= 4,
+	SECURESOCK		= 5
+};
 
+//return types
+static constexpr int WEBXSOCK_ERROR   = -1;
+static constexpr int INVALID_WEBXSOCK = 0;
+static constexpr int WEBXSOCK_SUCCESS = 1;
+
+//webxsock initialization struct
+typedef struct webxsockdata
+{
+	std::string address;
+	std::string port;
+
+	WEBXSOCK_PROPERTY ipprotocol;
+	WEBXSOCK_PROPERTY dataprotocol;
+	WEBXSOCK_PROPERTY socktype;
+} webxsockdata;
+
+//struct for building http response
 typedef struct HTTP_packet
 {
 	std::string responsecode;
@@ -31,84 +54,82 @@ typedef struct HTTP_packet
 	std::string response_content;
 } HTTP_packet;
 
+//namespace encompassing all webxlib functionality
 class webxlib
 {
 public:
-	class socket;
+	class webxsocket;
 	class webhook;
-	class webqueue;
-	class lockz;
+	class HTTPEvent;
 
-	socket* NewWebsock(csockdata* data);
-	webhook* NewWebhookInterface();
-
-	std::map<std::string, std::string> ParseHTTPRequest(char* data);
-	std::string BuildResponsePacket(HTTP_packet sv);
-
-	std::vector<std::string> stringExp(std::string const& s, char delim);
+	std::vector<std::string> strExplode(std::string const& s, char delim);
 	std::map<std::string, std::string> GetMimetypesTable();
-	uint8_t* LoadFiletoMem(char* filename, size_t* fsize);
-	bool fileExists(const char* filename);
+
+	uint8_t* LoadFile(char* fname, size_t* fsize);
+	bool fileIsValid(const char* fname);
 	char* systime();
-
-	static const WEBXLIB_ENUM TCPWEBSOCK		= CSOCKET::CSOCKET_TCP;
-	static const WEBXLIB_ENUM UDPWEBSOCK		= CSOCKET::CSOCKET_UDP;
-
-	static const WEBXLIB_ENUM IPV4WEBSOCK		= CSOCKET::CSOCKET_IPV4;
-	static const WEBXLIB_ENUM IPV6WEBSOCK		= CSOCKET::CSOCKET_IPV6;
-
-	static const WEBXLIB_ENUM SIMPLEWEBSOCK		= CSOCKET::CSOCKET_SIMPLE;
-	static const WEBXLIB_ENUM SSLWEBSOCK		= CSOCKET::CSOCKET_SSL;
-
-	static const WEBXLIB_ENUM WEBSOCK_ERROR		= CSOCKET::CSOCKET_FATAL_ERROR;
-	static const WEBXLIB_ENUM WEBSOCK_SUCCESS	= CSOCKET::CSOCKET_SOCK_SUCCESS;
-	static const WEBXLIB_ENUM WEBSOCK_INVALID	= CSOCKET::CSOCKET_INVALID_SOCKET;
 };
 
-typedef struct qpair
-{
-	WEBXLIB_ENUM status;
-	webxlib::socket* client;
-
-	bool operator==(const qpair& other) { return client == other.client; };
-} qpair;
-
-class webxlib::socket
+//sockets class
+class webxlib::webxsocket
 {
 public:
-	socket(csockdata*);
-	~socket();
+	webxsocket(webxsockdata* sockinfo);
+	webxsocket(const webxsocket&) = default;
+	virtual ~webxsocket();
+
+	int SSL_Init(const char* cert, const char* key);
+
+	static int WSAInit();
+	static int WSAExit();
+	int WSAError();
 
 	int Bind();
-	int Listen();
-	socket* Accept();
-	int Connect();
-
-	int SSLInit(const char* cert, const char* key);
 	int SSLBind();
-	int SSLAccept();
+
+	int Listen();
+
+	int Connect();
 	int SSLConnect();
+
+	webxsocket* Accept();
+	int SSLAccept();
+
+	int SelectReadable(const timeval timeout);
+	int SelectWriteable(const timeval timeout);
 	int SSLWantRead();
 	int SSLWantWrite();
 
+	int SetSockOpt(int lvl, int optname, const char* optval, int optlen);
+	int IOCtrlSocket(long cmd, u_long* argp);
+
+	void SetType(WEBXSOCK_PROPERTY type);
 	bool IsValid();
 	int CheckType();
-	int SelectReadable(const timeval timeout);
-	int SelectWriteable(const timeval timeout);
-	void SetType(WEBXLIB_ENUM type);
-	int SetSockOpt(int lvl, int optname, const char* optval, int optlen);
-	int IOCtrlSock(long cmd, u_long* argp);
 
+	int Send(const char* data, int size);
+	int Recv(char* data, int size);
 
-	int Send(const char* data, int sz);
-	int Recv(char* data, int sz);
-
-	inline bool operator==(const socket* other) { return this->websock == other->websock; };
+	inline bool operator==(const webxsocket* other)
+	{return this->webxsock_handle == other->webxsock_handle;};
 protected:
-	socket(CSOCKET*);
-	CSOCKET* websock = nullptr;
+	webxsocket();
+	webxsocket(SOCKET);
+
+	SOCKET webxsock_handle = INVALID_WEBXSOCK;
+
+	addrinfo* result   = nullptr;
+	sockaddr_in remloc = { 0 };
+
+	WOLFSSL_CTX* csocket_context = nullptr;
+	WOLFSSL* csocket_ssl		 = nullptr;
+
+	int dataprotocol	= 0;
+	int ipprotocol		= 0;
+	int socktype		= 0;
 };
 
+//webhook class
 class webxlib::webhook
 {
 public:
@@ -122,32 +143,16 @@ protected:
 	std::map<std::string, void*> hooktable;
 };
 
-class webxlib::webqueue
+class webxlib::HTTPEvent
 {
 public:
-	void PushQueue(qpair cl);
-	void PopQueue(const qpair& cl);
+	HTTPEvent(void* funcptr);
+	virtual ~HTTPEvent();
 
-	void UpdateStatus(qpair cl, WEBXLIB_ENUM status);
-	void ClearQueue();
-
-	int QueueCount();
-
-	std::vector<qpair> GetQueue();
+	void Run(void* arg, void* argg);
 protected:
-	std::vector<qpair> webq;
-};
-
-class webxlib::lockz
-{
-public:
-	lockz();
-	~lockz();
-
-	void Acquire();
-	void Release();
-protected:
-	CRITICAL_SECTION m_criticalSection;
+	static void _catalyst(void* pParam, void* pparam2);
+	void* routine = nullptr;
 };
 
 #endif //WEBXLIB_H

@@ -5,125 +5,355 @@
 #include <ctime>
 #include <algorithm>
 
-/************************************************
-webxlib::socket library funcs
-*************************************************/
-webxlib::socket::socket(csockdata* data)
+bool ssl_init = false;
+
+/********************************************************************
+webxlib::webxsocket class
+********************************************************************/
+/****************************************
+constructor overloads & destructor
+****************************************/
+int webxlib::webxsocket::WSAInit()
 {
-	this->websock = new CSOCKET(data);
+	WSADATA wsa; 
+	return WSAStartup(MAKEWORD(2, 2), &wsa);
 }
 
-webxlib::socket::socket(CSOCKET* cl)
+int webxlib::webxsocket::WSAExit()
 {
-	this->websock = cl;
+	return WSACleanup();
 }
 
-webxlib::socket::~socket()
+int webxlib::webxsocket::WSAError()
 {
-	delete this->websock;
+	return WSAGetLastError();
 }
 
-int webxlib::socket::Bind()
+webxlib::webxsocket::webxsocket() : result(nullptr), webxsock_handle(INVALID_WEBXSOCK)
 {
-	return this->websock->Bind();
+	static bool csocket_initialized = false;
+
+	if (csocket_initialized == false) {
+		if (this->WSAInit() != 0) {
+			printf("Winsock errored with code '0x%i'!\n", this->WSAError());
+		}
+
+		csocket_initialized = true;
+	}
 }
 
-int webxlib::socket::Listen()
+webxlib::webxsocket::webxsocket(SOCKET sock) : webxsocket()
 {
-	return this->websock->Listen();
+	this->webxsock_handle = sock;
+
+	if (this->webxsock_handle == INVALID_WEBXSOCK) {
+		printf("Winsock errored with code '0x%i'!\n", this->WSAError());
+
+		freeaddrinfo(this->result);
+	}
 }
 
-webxlib::socket* webxlib::socket::Accept()
+webxlib::webxsocket::webxsocket(webxsockdata* csock) : webxsocket()
 {
-	return new webxlib::socket(this->websock->Accept());
+	addrinfo hints;
+	ZeroMemory(&hints, sizeof(hints));
+
+	if (csock->ipprotocol == IPV4SOCK) {
+		this->ipprotocol = IPV4SOCK;
+
+		if (csock->dataprotocol == TCPSOCK) {
+			this->dataprotocol = TCPSOCK;
+
+			hints.ai_family = AF_INET;
+			hints.ai_socktype = SOCK_STREAM;
+			hints.ai_protocol = IPPROTO_TCP;
+		} else if (csock->dataprotocol == UDPSOCK) {
+			this->dataprotocol = UDPSOCK;
+
+			hints.ai_family = AF_INET;
+			hints.ai_socktype = SOCK_DGRAM;
+			hints.ai_protocol = IPPROTO_UDP;
+		}
+	} else if (csock->ipprotocol == IPV6SOCK) {
+		this->ipprotocol = IPV6SOCK;
+
+		if (csock->dataprotocol == TCPSOCK) {
+			this->dataprotocol = TCPSOCK;
+
+			hints.ai_family = AF_INET6;
+			hints.ai_socktype = SOCK_STREAM;
+			hints.ai_protocol = IPPROTO_TCP;
+		} else if (csock->dataprotocol == UDPSOCK) {
+			this->dataprotocol = UDPSOCK;
+
+			hints.ai_family = AF_INET6;
+			hints.ai_socktype = SOCK_DGRAM;
+			hints.ai_protocol = IPPROTO_UDP;
+		}
+	}
+
+	if (getaddrinfo((PCSTR)csock->address.c_str(), csock->port.c_str(), &hints, &this->result) != 0) {
+		printf("getaddrinfo call errored with code '0x%i'!\n", this->WSAError());
+
+		return;
+	}
+
+	SOCKET new_socket = socket(this->result->ai_family, this->result->ai_socktype, this->result->ai_protocol);
+	if (new_socket == INVALID_WEBXSOCK) {
+		printf("ctor 'socket' call errored with code '0x%i'!\n", this->WSAError());
+	} else {
+		this->webxsock_handle = new_socket;
+	}
+
+	this->socktype = csock->socktype;
 }
 
-int webxlib::socket::Connect()
+webxlib::webxsocket::~webxsocket()
 {
-	return this->websock->Connect();
+	if (this->webxsock_handle != INVALID_WEBXSOCK) {
+		closesocket(this->webxsock_handle);
+
+		if (this->result != nullptr) {
+			freeaddrinfo(this->result);
+			this->result = nullptr;
+		}
+	}
+
+	if (this->csocket_context != nullptr) {
+		wolfSSL_CTX_free(this->csocket_context);
+	} else if (this->csocket_ssl != nullptr) {
+		wolfSSL_free(this->csocket_ssl);
+	}
+
+	wolfSSL_Cleanup();
 }
 
-int webxlib::socket::SSLConnect()
+/****************************************
+class member definitions
+****************************************/
+int webxlib::webxsocket::SSL_Init(const char* cert, const char* key)
 {
-	return this->websock->SSLConnect();
+	this->SetType(SECURESOCK);
+
+	if (ssl_init == false) {
+		wolfSSL_Init();
+
+		ssl_init = true;
+	}
+
+	if ((this->csocket_context = wolfSSL_CTX_new(wolfTLSv1_2_server_method())) == NULL) {
+		printf("[csocket] failed to create context object\n");
+	}
+
+	if (wolfSSL_CTX_load_verify_locations(this->csocket_context, cert, 0) != WEBXSOCK_SUCCESS) {
+		printf("[csocket] failed to verify ssl certificate\n");
+
+		return WEBXSOCK_ERROR;
+	}
+
+	if (wolfSSL_CTX_use_certificate_file(this->csocket_context, cert, SSL_FILETYPE_PEM) != WEBXSOCK_SUCCESS) {
+		printf("[csocket] failed to load ssl certificate\n");
+
+		return WEBXSOCK_ERROR;
+	}
+
+	if (wolfSSL_CTX_use_PrivateKey_file(this->csocket_context, key, SSL_FILETYPE_PEM) != WEBXSOCK_SUCCESS) {
+		printf("[csocket] failed to load ssl key\n");
+
+		return WEBXSOCK_ERROR;
+	}
+
+	if ((this->csocket_ssl = wolfSSL_new(this->csocket_context)) == NULL) {
+		printf("[csocket] failed to create SSL object\n");
+	}
+
+	return WEBXSOCK_SUCCESS;
 }
 
-int webxlib::socket::SSLInit(const char* cert, const char* key)
+int webxlib::webxsocket::Bind()
 {
-	return this->websock->SSL_Init(cert, key);
+	if (bind(this->webxsock_handle, this->result->ai_addr, (int)this->result->ai_addrlen) == WEBXSOCK_ERROR) {
+		return this->WSAError();
+	}
+
+	return WEBXSOCK_SUCCESS;
 }
 
-int webxlib::socket::SSLBind()
+int webxlib::webxsocket::SSLBind()
 {
-	return this->websock->SSLBind();
+	return wolfSSL_set_fd(this->csocket_ssl, this->webxsock_handle);
 }
 
-int webxlib::socket::SSLAccept()
+int webxlib::webxsocket::Listen()
 {
-	return this->websock->SSLAccept();
+	if (listen(this->webxsock_handle, SOMAXCONN) == WEBXSOCK_ERROR) {
+		return this->WSAError();
+	}
+
+	return WEBXSOCK_SUCCESS;
 }
 
-int webxlib::socket::SSLWantRead()
+int webxlib::webxsocket::Connect()
 {
-	return this->websock->SSLWantRead();
+	if (connect(this->webxsock_handle, this->result->ai_addr, (int)this->result->ai_addrlen) == WEBXSOCK_ERROR) {
+		return this->WSAError();
+	}
+
+	return WEBXSOCK_SUCCESS;
+}
+int webxlib::webxsocket::SSLConnect()
+{
+	int ret = wolfSSL_connect(this->csocket_ssl);
+	if (ret != WEBXSOCK_SUCCESS)
+		return wolfSSL_get_error(this->csocket_ssl, ret);
+
+	return WEBXSOCK_SUCCESS;
 }
 
-int webxlib::socket::SSLWantWrite()
+webxlib::webxsocket* webxlib::webxsocket::Accept()
 {
-	return this->websock->SSLWantWrite();
+	int len = sizeof(remloc);
+
+	SOCKET temp_sock = accept(this->webxsock_handle, (struct sockaddr*) & this->remloc, &len);
+	if (temp_sock != INVALID_WEBXSOCK) {
+		webxlib::webxsocket* ncs = new webxlib::webxsocket(temp_sock);
+		ncs->result = nullptr;
+		ncs->SetType(STANDARDSOCK);
+
+		return ncs;
+	}
+
+	printf("'Accept' class function errored with code '0x%i'!\n", this->WSAError());
+
+	return nullptr;
 }
 
-bool webxlib::socket::IsValid()
+int webxlib::webxsocket::SSLAccept()
 {
-	return this->websock->IsValid();
+	int ret = wolfSSL_accept(this->csocket_ssl);
+	if (ret != WEBXSOCK_SUCCESS)
+		return wolfSSL_get_error(this->csocket_ssl, ret);
+
+	return WEBXSOCK_SUCCESS;
 }
 
-int webxlib::socket::CheckType()
+int webxlib::webxsocket::SelectReadable(const timeval timeout)
 {
-	return this->websock->CheckType();
+	fd_set a = { 1, {this->webxsock_handle} };
+
+	int wsares = select(0, &a, 0, 0, &timeout);
+	if (wsares == WEBXSOCK_ERROR) {
+		return this->WSAError();
+	}
+
+	return wsares;
 }
 
-int webxlib::socket::SelectReadable(const timeval timeout)
+int webxlib::webxsocket::SelectWriteable(const timeval timeout)
 {
-	return this->websock->SelectReadable(timeout);
+	fd_set a = { 1, {this->webxsock_handle} };
+
+	int wsares = select(0, 0, &a, 0, &timeout);
+	if (wsares == WEBXSOCK_ERROR) {
+		return this->WSAError();
+	}
+
+	return wsares;
 }
 
-int webxlib::socket::SelectWriteable(const timeval timeout)
+int webxlib::webxsocket::SSLWantRead()
 {
-	return this->websock->SelectWriteable(timeout);
+	return wolfSSL_want_read(this->csocket_ssl);
 }
 
-void webxlib::socket::SetType(WEBXLIB_ENUM type)
+int webxlib::webxsocket::SSLWantWrite()
 {
-	this->websock->SetType(type);
+	return wolfSSL_want_write(this->csocket_ssl);
+}
+
+int webxlib::webxsocket::SetSockOpt(int lvl, int optname, const char* optval, int oplen)
+{
+	return setsockopt(this->webxsock_handle, lvl, optname, optval, oplen);
+}
+int webxlib::webxsocket::IOCtrlSocket(long cmd, u_long* argp)
+{
+	return ioctlsocket(this->webxsock_handle, cmd, argp);
+}
+
+int webxlib::webxsocket::CheckType()
+{
+	return this->socktype;
+}
+
+void webxlib::webxsocket::SetType(WEBXSOCK_PROPERTY type)
+{
+	this->socktype = type;
 
 	return;
 }
 
-int webxlib::socket::SetSockOpt(int lvl, int optname, const char* optval, int optlen)
+bool webxlib::webxsocket::IsValid()
 {
-	return this->websock->SetSockOpt(lvl, optname, optval, optlen);
+	return (this->webxsock_handle != INVALID_WEBXSOCK);
 }
 
-int webxlib::socket::IOCtrlSock(long cmd, u_long* argp)
+int webxlib::webxsocket::Send(const char* data, int size)
 {
-	return this->websock->IOCtrlSocket(cmd, argp);
+	int wsares = 0;
+
+	if (this->CheckType() == STANDARDSOCK) {
+		if (this->dataprotocol == TCPSOCK) {
+			wsares = send(this->webxsock_handle, data, size, 0);
+		} else if (this->dataprotocol == UDPSOCK) {
+			wsares = sendto(this->webxsock_handle, data, size, 0, this->result->ai_addr, this->result->ai_addrlen);
+		}
+
+		if (wsares != WEBXSOCK_ERROR) {
+			return wsares;
+		} else {
+			return this->WSAError();
+		}
+	} else if (this->CheckType() == SECURESOCK) {
+		wsares = wolfSSL_write(this->csocket_ssl, data, size);
+		if (wsares <= 0)
+			printf("'Send' class function failed to send data via https(SSL error code %d)\n", wolfSSL_get_error(this->csocket_ssl, wsares));
+
+		return wsares;
+	}
+
+	return WEBXSOCK_ERROR;
 }
 
-int webxlib::socket::Send(const char* data, int sz)
+int webxlib::webxsocket::Recv(char* buff, int size)
 {
-	return this->websock->Send(data, sz);
+	int wsares = 0;
+
+	if (this->CheckType() == STANDARDSOCK) {
+		if (this->dataprotocol == TCPSOCK) {
+			wsares = recv(this->webxsock_handle, buff, size, 0);
+		} else if (this->dataprotocol == UDPSOCK) {
+			wsares = recvfrom(this->webxsock_handle, buff, size, 0, NULL, NULL);
+		}
+
+		if (wsares != WEBXSOCK_ERROR) {
+			return wsares;
+		} else {
+			return this->WSAError();
+		}
+	} else if (this->CheckType() == SECURESOCK) {
+		wsares = wolfSSL_read(this->csocket_ssl, buff, size);
+		if (wsares <= 0)
+			printf("'Recv' class function failed to read data via https(SSL error code %d)\n", wolfSSL_get_error(this->csocket_ssl, wsares));
+
+		return wsares;
+	}
+
+	return WEBXSOCK_ERROR;
 }
 
-int webxlib::socket::Recv(char* data, int sz)
-{
-	return this->websock->Recv(data, sz);
-}
-
-/************************************************
-webxlib::webhook library funcs
-*************************************************/
-
+/********************************************************************
+webxlib::webhook class
+********************************************************************/
 void webxlib::webhook::RegisterWebhook(std::string id, void* ptr)
 {
 	this->hooktable[id] = ptr;
@@ -141,120 +371,28 @@ bool webxlib::webhook::hookIsValid(std::string id)
 	return it != this->hooktable.end();
 }
 
-/************************************************
-webxlib::webqueue library funcs
-*************************************************/
-void  webxlib::webqueue::PushQueue(qpair cl)
+/********************************************************************
+webxlib::HTTPEvent class
+********************************************************************/
+webxlib::HTTPEvent::HTTPEvent(void* funcptr)
 {
-	this->webq.push_back(cl);
+	this->routine = funcptr;
 }
 
-void webxlib::webqueue::PopQueue(const qpair& cl)
+webxlib::HTTPEvent::~HTTPEvent()
 {
-	this->webq.erase(std::remove(this->webq.begin(), this->webq.end(), cl));
+	this->routine = nullptr;
 }
 
-std::vector<qpair> webxlib::webqueue::GetQueue()
+void webxlib::HTTPEvent::Run(void* argp, void* argpp)
 {
-	return this->webq;
+	(decltype(&this->_catalyst)(this->routine))(argp, argpp);
 }
 
-void webxlib::webqueue::UpdateStatus(qpair cl, WEBXLIB_ENUM status)
-{
-	cl.status = status;
-}
-
-int webxlib::webqueue::QueueCount()
-{
-	return this->webq.size();
-}
-
-void webxlib::webqueue::ClearQueue()
-{
-	this->webq.clear();
-}
-
-/************************************************
-webxlib::lockz library funcs
-*************************************************/
-webxlib::lockz::lockz()
-{
-	InitializeCriticalSection(&this->m_criticalSection);
-}
-
-webxlib::lockz::~lockz()
-{
-	DeleteCriticalSection(&this->m_criticalSection);
-}
-
-void webxlib::lockz::Acquire()
-{
-	EnterCriticalSection(&this->m_criticalSection);
-}
-
-void webxlib::lockz::Release()
-{
-	LeaveCriticalSection(&this->m_criticalSection);
-}
-
-/************************************************
-webxlib interface funcs
-*************************************************/
-webxlib::socket* webxlib::NewWebsock(csockdata* data)
-{
-	return new webxlib::socket(data);
-}
-
-webxlib::webhook* webxlib::NewWebhookInterface()
-{
-	return new webxlib::webhook();
-}
-
-std::map<std::string, std::string> webxlib::ParseHTTPRequest(char* data)
-{
-	auto buff = stringExp(data, (char)'\r\n');
-	auto reqs = stringExp(buff[0], ' ');
-
-	std::map<std::string, std::string> ret;
-	ret["METHOD"] = reqs[0];
-	ret["DATA"] = reqs[1];
-	ret["VERSION"] = reqs[2];
-
-	std::vector<std::string> lines;
-	for (int i = 0; i <= buff.size() - 3; i++) {
-		lines.push_back(buff[i]);
-	}
-
-	for (int k = 1; k < (int)lines.size(); k++) {
-		auto req_data = stringExp(lines[k], ':');
-
-		std::string value, prev;
-		for (auto& g : req_data) {
-			value = g.substr(1, g.size());
-
-			if (g[0] != ' ') {
-				prev = value;
-			} else {
-				ret.emplace(prev, value);
-			}
-		}
-	}
-
-	return ret;
-}
-
-std::string webxlib::BuildResponsePacket(HTTP_packet sv)
-{
-	return "HTTP/1.1 " + sv.responsecode + "\r\n"
-		+ "Server: " + sv.server + "\r\n"
-		+ "Date: " + systime() + "\r\n"
-		+ "Content-Length: " + sv.content_length + "\r\n"
-		+ "Content-Type: " + sv.content_type + "\r\n"
-		+ "Connection: " + sv.connection + "\r\n\r\n"
-		+ sv.response_content;
-}
-
-std::vector<std::string> webxlib::stringExp(std::string const& s, char delim)
+/********************************************************************
+webxlib class
+********************************************************************/
+std::vector<std::string> webxlib::strExplode(std::string const& s, char delim)
 {
 	std::string buff{ "" };
 	std::vector<std::string> v;
@@ -269,7 +407,7 @@ std::vector<std::string> webxlib::stringExp(std::string const& s, char delim)
 	return v;
 }
 
-uint8_t* webxlib::LoadFiletoMem(char* filename, size_t* fsize)
+uint8_t* webxlib::LoadFile(char* filename, size_t* fsize)
 {
 	FILE* f = fopen(filename, "rb");
 	fseek(f, 0, SEEK_END);
@@ -283,7 +421,7 @@ uint8_t* webxlib::LoadFiletoMem(char* filename, size_t* fsize)
 	return buffer;
 }
 
-bool webxlib::fileExists(const char* filename)
+bool webxlib::fileIsValid(const char* filename)
 {
 	return (_access(filename, 0) != -1);
 }
