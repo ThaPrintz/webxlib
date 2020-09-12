@@ -1,0 +1,3 @@
+﻿  webxlib.cpp
+  Warning: For timing resistance / side-channel attack prevention consider using harden options
+  webxlib.vcxproj -> E:\Visual Studio Projects\webxlib\Release\webxlib.lib

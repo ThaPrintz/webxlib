@@ -1,5 +1,5 @@
 #pragma once
-#define WIN32_LEAN_AND_MEAN  
+#define WIN32_LEAN_AND_MEAN
 
 #ifndef WEBXLIB_H
 #define WEBXLIB_H
@@ -12,53 +12,41 @@
 #include <vector>
 
 /**********************************************************
-webxlib::webxsock enums, return types & data structures
+webxlib::csocket enums, return types & data structures
 ***********************************************************/
-enum WEBXSOCK_PROPERTY
+enum CSOCK_PROPERTY
 {
-	TCPSOCK			= 0,
-	UDPSOCK			= 1,
+	TCPSOCK,
+	UDPSOCK,
 
-	IPV4SOCK		= 2,
-	IPV6SOCK		= 3,
+	IPV4SOCK,
+	IPV6SOCK,
 
-	STANDARDSOCK	= 4,
-	SECURESOCK		= 5
+	STANDARDSOCK,
+	SECURESOCK
 };
 
 //return types
-static constexpr int WEBXSOCK_ERROR   = -1;
-static constexpr int INVALID_WEBXSOCK = 0;
-static constexpr int WEBXSOCK_SUCCESS = 1;
+static constexpr int CSOCKET_ERROR   = -1;
+static constexpr int CSOCKET_INVALID = 0;
+static constexpr int CSOCKET_SUCCESS = 1;
 
-//webxsock initialization struct
-typedef struct webxsockdata
+//csock data struct
+typedef struct csocketinfo
 {
 	std::string address;
 	std::string port;
 
-	WEBXSOCK_PROPERTY ipprotocol;
-	WEBXSOCK_PROPERTY dataprotocol;
-	WEBXSOCK_PROPERTY socktype;
-} webxsockdata;
+	CSOCK_PROPERTY ipprotocol;
+	CSOCK_PROPERTY dataprotocol;
+	CSOCK_PROPERTY socktype;
+} csockdata;
 
-//struct for building http response
-typedef struct HTTP_packet
-{
-	std::string responsecode;
-	std::string server;
-	std::string date;
-	std::string content_length;
-	std::string content_type;
-	std::string connection;
-	std::string response_content;
-} HTTP_packet;
-
-//namespace encompassing all webxlib functionality
+//webxlib class
 class webxlib
 {
 public:
-	class webxsocket;
+	class csocket;
 	class webhook;
 	class HTTPEvent;
 
@@ -70,13 +58,13 @@ public:
 	char* systime();
 };
 
-//sockets class
-class webxlib::webxsocket
+//socket class
+class webxlib::csocket
 {
 public:
-	webxsocket(webxsockdata* sockinfo);
-	webxsocket(const webxsocket&) = default;
-	virtual ~webxsocket();
+	csocket(csockdata* sockinfo);
+	csocket(const csocket&) = default;
+	virtual ~csocket();
 
 	int SSL_Init(const char* cert, const char* key);
 
@@ -92,7 +80,7 @@ public:
 	int Connect();
 	int SSLConnect();
 
-	webxsocket* Accept();
+	csocket* Accept();
 	int SSLAccept();
 
 	int SelectReadable(const timeval timeout);
@@ -103,33 +91,34 @@ public:
 	int SetSockOpt(int lvl, int optname, const char* optval, int optlen);
 	int IOCtrlSocket(long cmd, u_long* argp);
 
-	void SetType(WEBXSOCK_PROPERTY type);
+	void SetType(CSOCK_PROPERTY type);
+	CSOCK_PROPERTY CheckType();
+
 	bool IsValid();
-	int CheckType();
 
 	int Send(const char* data, int size);
 	int Recv(char* data, int size);
 
-	inline bool operator==(const webxsocket* other)
+	inline bool operator==(const csocket* other)
 	{return this->webxsock_handle == other->webxsock_handle;};
 protected:
-	webxsocket();
-	webxsocket(SOCKET);
+	csocket();
+	csocket(SOCKET);
 
-	SOCKET webxsock_handle = INVALID_WEBXSOCK;
+	SOCKET webxsock_handle = CSOCKET_INVALID;
 
-	addrinfo* result   = nullptr;
-	sockaddr_in remloc = { 0 };
+	addrinfo* result	= nullptr;
+	sockaddr_in remloc	= { 0 };
 
 	WOLFSSL_CTX* csocket_context = nullptr;
 	WOLFSSL* csocket_ssl		 = nullptr;
 
-	int dataprotocol	= 0;
-	int ipprotocol		= 0;
-	int socktype		= 0;
+	csockdata* _data = nullptr;
 };
 
-//webhook class
+/**********************************************************
+webxlib::webhook class
+***********************************************************/
 class webxlib::webhook
 {
 public:
@@ -143,6 +132,9 @@ protected:
 	std::map<std::string, void*> hooktable;
 };
 
+/**********************************************************
+webxlib::HTTPEvent class
+***********************************************************/
 class webxlib::HTTPEvent
 {
 public:
@@ -154,5 +146,4 @@ protected:
 	static void _catalyst(void* pParam, void* pparam2);
 	void* routine = nullptr;
 };
-
-#endif //WEBXLIB_H
+#endif  //WEBXLIB_H
