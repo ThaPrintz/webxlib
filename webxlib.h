@@ -23,6 +23,7 @@ enum CSOCK_PROPERTY
 	IPV6SOCK,
 
 	STANDARDSOCK,
+	WEBSOCK,
 	SECURESOCK
 };
 
@@ -146,4 +147,5 @@ protected:
 	static void _catalyst(void* pParam, void* pparam2);
 	void* routine = nullptr;
 };
+
 #endif  //WEBXLIB_H
