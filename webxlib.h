@@ -133,19 +133,4 @@ protected:
 	std::map<std::string, void*> hooktable;
 };
 
-/**********************************************************
-webxlib::HTTPEvent class
-***********************************************************/
-class webxlib::HTTPEvent
-{
-public:
-	HTTPEvent(void* funcptr);
-	virtual ~HTTPEvent();
-
-	void Run(void* arg, void* argg);
-protected:
-	static void _catalyst(void* pParam, void* pparam2);
-	void* routine = nullptr;
-};
-
 #endif  //WEBXLIB_H

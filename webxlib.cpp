@@ -361,24 +361,6 @@ bool webxlib::webhook::hookIsValid(std::string id)
 }
 
 /********************************************************************
-webxlib::HTTPEvent class
-********************************************************************/
-webxlib::HTTPEvent::HTTPEvent(void* funcptr)
-{
-	this->routine = funcptr;
-}
-
-webxlib::HTTPEvent::~HTTPEvent()
-{
-	this->routine = nullptr;
-}
-
-void webxlib::HTTPEvent::Run(void* argp, void* argpp)
-{
-	(decltype(&this->_catalyst)(this->routine))(argp, argpp);
-}
-
-/********************************************************************
 webxlib class
 ********************************************************************/
 std::vector<std::string> webxlib::strExplode(std::string const& s, char delim)
