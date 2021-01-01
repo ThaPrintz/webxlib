@@ -14,18 +14,13 @@
 /**********************************************************
 webxlib::csocket enums, return types & data structures
 ***********************************************************/
-enum CSOCK_PROPERTY
-{
-	TCPSOCK,
-	UDPSOCK,
+static constexpr int TCPSOCK		= 0;
+static constexpr int UDPSOCK		= 1;
+								 
+static constexpr int IPV4SOCK		= 2;
+static constexpr int IPV6SOCK		= 3;
 
-	IPV4SOCK,
-	IPV6SOCK,
-
-	STANDARDSOCK,
-	WEBSOCK,
-	SECURESOCK
-};
+static constexpr int WEBSOCK		= 5;
 
 //return types
 static constexpr int CSOCKET_ERROR   = -1;
@@ -38,9 +33,8 @@ typedef struct csocketinfo
 	std::string address;
 	std::string port;
 
-	CSOCK_PROPERTY ipprotocol;
-	CSOCK_PROPERTY dataprotocol;
-	CSOCK_PROPERTY socktype;
+	int ipprotocol;
+	int dataprotocol;
 } csockdata;
 
 //webxlib class
@@ -51,8 +45,10 @@ public:
 	class webhook;
 	class HTTPEvent;
 
+	std::map<std::string, std::string> ParseHTTPRequest(char* data);
 	std::vector<std::string> strExplode(std::string const& s, char delim);
 	std::map<std::string, std::string> GetMimetypesTable();
+	std::string BuildResponsePacket(std::string resp, std::string sv, std::string clength, std::string ctype, std::string svcon, std::string respcon);
 
 	uint8_t* LoadFile(char* fname, size_t* fsize);
 	bool fileIsValid(const char* fname);
@@ -92,8 +88,8 @@ public:
 	int SetSockOpt(int lvl, int optname, const char* optval, int optlen);
 	int IOCtrlSocket(long cmd, u_long* argp);
 
-	void SetType(CSOCK_PROPERTY type);
-	CSOCK_PROPERTY CheckType();
+	bool SetSecure(bool sec);
+	bool CheckType();
 
 	bool IsValid();
 
@@ -115,6 +111,7 @@ protected:
 	WOLFSSL* csocket_ssl		 = nullptr;
 
 	csockdata* _data = nullptr;
+	bool _secure = false;
 };
 
 /**********************************************************

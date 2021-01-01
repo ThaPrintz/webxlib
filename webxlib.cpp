@@ -46,6 +46,9 @@ webxlib::csocket::csocket(SOCKET sock) : csocket()
 {
 	this->webxsock_handle = sock;
 
+	csockdata ncs;
+	this->_data = &ncs;
+
 	if (this->webxsock_handle == CSOCKET_INVALID) {
 		printf("Winsock errored with code '0x%i'!\n", this->WSAError());
 
@@ -121,7 +124,7 @@ class member definitions
 ****************************************/
 int webxlib::csocket::SSL_Init(const char* cert, const char* key)
 {
-	this->SetType(SECURESOCK);
+	this->SetSecure(true);
 
 	if (ssl_init == false) {
 		wolfSSL_Init();
@@ -201,12 +204,12 @@ int webxlib::csocket::SSLConnect()
 webxlib::csocket* webxlib::csocket::Accept()
 {
 	int len = sizeof(remloc);
-
 	SOCKET temp_sock = accept(this->webxsock_handle, (struct sockaddr*) & this->remloc, &len);
+
 	if (temp_sock != CSOCKET_INVALID) {
 		webxlib::csocket* ncs = new webxlib::csocket(temp_sock);
 		ncs->result = nullptr;
-		ncs->SetType(STANDARDSOCK);
+		ncs->SetSecure(false);
 
 		return ncs;
 	}
@@ -268,16 +271,15 @@ int webxlib::csocket::IOCtrlSocket(long cmd, u_long* argp)
 	return ioctlsocket(this->webxsock_handle, cmd, argp);
 }
 
-CSOCK_PROPERTY webxlib::csocket::CheckType()
+bool webxlib::csocket::CheckType()
 {
-	return this->_data->socktype;
+	return this->_secure;
 }
 
-void webxlib::csocket::SetType(CSOCK_PROPERTY type)
+bool webxlib::csocket::SetSecure(bool sec)
 {
-	this->_data->socktype = type;
-
-	return;
+	this->_secure = sec;
+	return sec;
 }
 
 bool webxlib::csocket::IsValid()
@@ -289,7 +291,7 @@ int webxlib::csocket::Send(const char* data, int size)
 {
 	int wsares = 0;
 
-	if (this->CheckType() == STANDARDSOCK) {
+	if (!this->CheckType()) {
 		if (this->_data->dataprotocol == TCPSOCK) {
 			wsares = send(this->webxsock_handle, data, size, 0);
 		} else if (this->_data->dataprotocol == UDPSOCK) {
@@ -301,7 +303,7 @@ int webxlib::csocket::Send(const char* data, int size)
 		} else {
 			return this->WSAError();
 		}
-	} else if (this->CheckType() == SECURESOCK) {
+	} else if (this->CheckType()) {
 		wsares = wolfSSL_write(this->csocket_ssl, data, size);
 		if (wsares <= 0)
 			printf("'Send' class function failed to send data via https(SSL error code %d)\n", wolfSSL_get_error(this->csocket_ssl, wsares));
@@ -316,7 +318,7 @@ int webxlib::csocket::Recv(char* buff, int size)
 {
 	int wsares = 0;
 
-	if (this->CheckType() == STANDARDSOCK) {
+	if (!this->CheckType()) {
 		if (this->_data->dataprotocol == TCPSOCK) {
 			wsares = recv(this->webxsock_handle, buff, size, 0);
 		} else if (this->_data->dataprotocol == UDPSOCK) {
@@ -328,7 +330,7 @@ int webxlib::csocket::Recv(char* buff, int size)
 		} else {
 			return this->WSAError();
 		}
-	} else if (this->CheckType() == SECURESOCK) {
+	} else if (this->CheckType()) {
 		wsares = wolfSSL_read(this->csocket_ssl, buff, size);
 		if (wsares <= 0)
 			printf("'Recv' class function failed to read data via https(SSL error code %d)\n", wolfSSL_get_error(this->csocket_ssl, wsares));
@@ -376,6 +378,50 @@ std::vector<std::string> webxlib::strExplode(std::string const& s, char delim)
 	if (buff != "") v.push_back(buff);
 
 	return v;
+}
+
+std::string webxlib::BuildResponsePacket(std::string resp, std::string sv, std::string clength, std::string ctype, std::string svcon, std::string respcon)
+{
+	return "HTTP/1.1 " + resp + "\r\n"
+		+ "Server: " + sv + "\r\n"
+		+ "Date: " + systime() + "\r\n"
+		+ "Content-Length: " + clength + "\r\n"
+		+ "Content-Type: " + ctype + "\r\n"
+		+ "Connection: " + svcon + "\r\n\r\n"
+		+ respcon;
+}
+
+std::map<std::string, std::string> webxlib::ParseHTTPRequest(char* data)
+{
+	auto buff = strExplode(data, (char)'\r\n');
+	auto reqs = strExplode(buff[0], ' ');
+
+	std::map<std::string, std::string> ret;
+	ret["METHOD"] = reqs[0];
+	ret["DATA"] = reqs[1];
+	ret["VERSION"] = reqs[2];
+
+	std::vector<std::string> lines;
+	for (int i = 0; i <= buff.size() - 3; i++) {
+		lines.push_back(buff[i]);
+	}
+
+	for (int k = 1; k < (int)lines.size(); k++) {
+		auto req_data = strExplode(lines[k], ':');
+
+		std::string value, prev;
+		for (auto& g : req_data) {
+			value = g.substr(1, g.size());
+
+			if (g[0] != ' ') {
+				prev = value;
+			} else {
+				ret.emplace(prev, value);
+			}
+		}
+	}
+
+	return ret;
 }
 
 uint8_t* webxlib::LoadFile(char* filename, size_t* fsize)
