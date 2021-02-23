@@ -83,7 +83,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>D:\APIs and Libraries\WolfSSL;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\APIs and Libraries\WolfSSL\Release1;$(LibraryPath)</LibraryPath>
+    <LibraryPath>D:\APIs and Libraries\WolfSSL\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -148,7 +148,7 @@
     </Link>
     <Lib>
       <AdditionalDependencies>wolfssl.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>D:\APIs and Libraries\WolfSSL\Release1;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>D:\APIs and Libraries\WolfSSL\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
