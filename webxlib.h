@@ -43,16 +43,16 @@ class webxlib
 public:
 	class csocket;
 	class webhook;
-	class HTTPEvent;
+	class HTTPServer;
 
-	std::map<std::string, std::string> ParseHTTPRequest(char* data);
-	std::vector<std::string> strExplode(std::string const& s, char delim);
-	std::map<std::string, std::string> GetMimetypesTable();
-	std::string BuildResponsePacket(std::string resp, std::string sv, std::string clength, std::string ctype, std::string svcon, std::string respcon);
-
-	uint8_t* LoadFile(char* fname, size_t* fsize);
-	bool fileIsValid(const char* fname);
-	char* systime();
+	static std::map<std::string, std::string> ParseHTTPRequest(char* data);
+	static std::vector<std::string> strExplode(std::string const& s, char delim);
+	static std::map<std::string, std::string> GetMimetypesTable();
+	static std::string BuildResponsePacket(std::string resp, std::string sv, std::string clength, std::string ctype, std::string svcon, std::string respcon);
+	
+	static uint8_t* LoadFile(char* fname, size_t* fsize);
+	static bool fileIsValid(const char* fname);
+	static char* systime();
 };
 
 //socket class
@@ -128,6 +128,61 @@ protected:
 	static void _catalyst(void* pParam, void* pparam2);
 
 	std::map<std::string, void*> hooktable;
+};
+
+/**********************************************************
+webxlib::HTTPServer class
+***********************************************************/
+typedef struct request_data
+{
+	webxlib::csocket* cl;
+	std::map<std::string, std::string> request_headers;
+} cl_data;
+
+typedef struct request_pkg
+{
+	webxlib::HTTPServer* sv;
+	webxlib::csocket* cl;
+} conpkg;
+
+static constexpr int SVPOWEROFF		= 0;
+static constexpr int SVPOWERON		= 1;
+static constexpr int SVPOWERPAUSE	= 2;
+
+class webxlib::HTTPServer
+{
+public:
+	HTTPServer();
+	virtual ~HTTPServer();
+
+	bool Start();
+	bool Pause();
+	webxlib::HTTPServer* Restart();
+	bool Stop();
+
+	void SetSSLCert(std::string certificate, std::string key);
+	void EnableSSL();
+
+	void RegisterRequestHandler(std::string id, void* funcptr);
+	void CallRequestHandler(std::string id, void* arg, void* argg);
+	bool ValidateReqHandler(std::string id);
+protected:
+	bool _SSL			= false;
+	int _svpower	= SVPOWEROFF;
+
+	std::string certificate_file;
+	std::string key_file;
+
+	csockdata http_data;
+	csockdata https_data;
+
+	webxlib::csocket* httpsv					   = nullptr;
+	webxlib::csocket* httpssv				   = nullptr;
+
+	webxlib::webhook* request_handlers = nullptr;
+	webxlib* webxif								   = nullptr;
+
+	static DWORD WINAPI _primaryrequesthandler(LPVOID _arg);
 };
 
 #endif  //WEBXLIB_H

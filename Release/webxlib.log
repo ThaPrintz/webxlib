@@ -1,1 +1,4 @@
-﻿  webxlib.vcxproj -> D:\Visual Studio Projects\webxlib\Release\webxlib.lib
+﻿  webxlib.cpp
+  Warning: For timing resistance / side-channel attack prevention consider using harden options
+D:\Visual Studio Projects\webxlib\webxlib.cpp(619,20): warning C4018: '<=': signed/unsigned mismatch
+  webxlib.vcxproj -> D:\Visual Studio Projects\webxlib\Release\webxlib.lib

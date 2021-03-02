@@ -35,7 +35,7 @@ webxlib::csocket::csocket() : result(nullptr), webxsock_handle(CSOCKET_INVALID)
 
 	if (csocket_initialized == false) {
 		if (this->WSAInit() != 0) {
-			printf("Winsock errored with code '0x%i'!\n", this->WSAError());
+			//printf("Winsock errored with code '0x%i'!\n", this->WSAError());
 		}
 
 		csocket_initialized = true;
@@ -50,7 +50,7 @@ webxlib::csocket::csocket(SOCKET sock) : csocket()
 	this->_data = &ncs;
 
 	if (this->webxsock_handle == CSOCKET_INVALID) {
-		printf("Winsock errored with code '0x%i'!\n", this->WSAError());
+		//printf("Winsock errored with code '0x%i'!\n", this->WSAError());
 
 		freeaddrinfo(this->result);
 	}
@@ -86,14 +86,14 @@ webxlib::csocket::csocket(csockdata* csock) : csocket()
 	}
 
 	if (getaddrinfo((PCSTR)csock->address.c_str(), csock->port.c_str(), &hints, &this->result) != 0) {
-		printf("getaddrinfo call errored with code '0x%i'!\n", this->WSAError());
+		//printf("getaddrinfo call errored with code '0x%i'!\n", this->WSAError());
 
 		return;
 	}
 
 	SOCKET new_socket = socket(this->result->ai_family, this->result->ai_socktype, this->result->ai_protocol);
 	if (new_socket == CSOCKET_INVALID) {
-		printf("ctor 'socket' call errored with code '0x%i'!\n", this->WSAError());
+		//printf("ctor 'socket' call errored with code '0x%i'!\n", this->WSAError());
 	} else {
 		this->webxsock_handle = new_socket;
 	}
@@ -133,29 +133,29 @@ int webxlib::csocket::SSL_Init(const char* cert, const char* key)
 	}
 
 	if ((this->csocket_context = wolfSSL_CTX_new(wolfTLSv1_2_server_method())) == NULL) {
-		printf("[csocket] failed to create context object\n");
+		//printf("[csocket] failed to create context object\n");
 	}
 
 	if (wolfSSL_CTX_load_verify_locations(this->csocket_context, cert, 0) != CSOCKET_SUCCESS) {
-		printf("[csocket] failed to verify ssl certificate\n");
+		//printf("[csocket] failed to verify ssl certificate\n");
 
 		return CSOCKET_ERROR;
 	}
 
 	if (wolfSSL_CTX_use_certificate_file(this->csocket_context, cert, SSL_FILETYPE_PEM) != CSOCKET_SUCCESS) {
-		printf("[csocket] failed to load ssl certificate\n");
+		//printf("[csocket] failed to load ssl certificate\n");
 
 		return CSOCKET_ERROR;
 	}
 
 	if (wolfSSL_CTX_use_PrivateKey_file(this->csocket_context, key, SSL_FILETYPE_PEM) != CSOCKET_SUCCESS) {
-		printf("[csocket] failed to load ssl key\n");
+		//printf("[csocket] failed to load ssl key\n");
 
 		return CSOCKET_ERROR;
 	}
 
 	if ((this->csocket_ssl = wolfSSL_new(this->csocket_context)) == NULL) {
-		printf("[csocket] failed to create SSL object\n");
+		//printf("[csocket] failed to create SSL object\n");
 	}
 
 	return CSOCKET_SUCCESS;
@@ -214,7 +214,7 @@ webxlib::csocket* webxlib::csocket::Accept()
 		return ncs;
 	}
 
-	printf("'Accept' class function errored with code '0x%i'!\n", this->WSAError());
+	//printf("'Accept' class function errored with code '0x%i'!\n", this->WSAError());
 
 	return nullptr;
 }
@@ -266,6 +266,7 @@ int webxlib::csocket::SetSockOpt(int lvl, int optname, const char* optval, int o
 {
 	return setsockopt(this->webxsock_handle, lvl, optname, optval, oplen);
 }
+
 int webxlib::csocket::IOCtrlSocket(long cmd, u_long* argp)
 {
 	return ioctlsocket(this->webxsock_handle, cmd, argp);
@@ -306,7 +307,7 @@ int webxlib::csocket::Send(const char* data, int size)
 	} else if (this->CheckType()) {
 		wsares = wolfSSL_write(this->csocket_ssl, data, size);
 		if (wsares <= 0)
-			printf("'Send' class function failed to send data via https(SSL error code %d)\n", wolfSSL_get_error(this->csocket_ssl, wsares));
+			//printf("'Send' class function failed to send data via https(SSL error code %d)\n", wolfSSL_get_error(this->csocket_ssl, wsares));
 
 		return wsares;
 	}
@@ -333,7 +334,7 @@ int webxlib::csocket::Recv(char* buff, int size)
 	} else if (this->CheckType()) {
 		wsares = wolfSSL_read(this->csocket_ssl, buff, size);
 		if (wsares <= 0)
-			printf("'Recv' class function failed to read data via https(SSL error code %d)\n", wolfSSL_get_error(this->csocket_ssl, wsares));
+			//printf("'Recv' class function failed to read data via https(SSL error code %d)\n", wolfSSL_get_error(this->csocket_ssl, wsares));
 
 		return wsares;
 	}
@@ -361,6 +362,219 @@ bool webxlib::webhook::hookIsValid(std::string id)
 
 	return it != this->hooktable.end();
 }
+
+/********************************************************************
+webxlib::HTTPServer class
+********************************************************************/
+webxlib::HTTPServer::HTTPServer()
+{
+	this->https_data.address			= "0.0.0.0";
+	this->https_data.port				= "443";
+	this->https_data.dataprotocol	= TCPSOCK;
+	this->https_data.ipprotocol		= IPV4SOCK;
+
+	this->http_data.address			= "0.0.0.0";
+	this->http_data.port					= "80";
+	this->http_data.dataprotocol	= TCPSOCK;
+	this->http_data.ipprotocol		= IPV4SOCK;
+
+	this->request_handlers = new webxlib::webhook();
+	this->webxif = new webxlib();
+}
+
+webxlib::HTTPServer::~HTTPServer()
+{
+	delete this->httpsv;
+	delete this->httpssv;
+
+	delete this->request_handlers;
+	delete this->webxif;
+}
+
+void webxlib::HTTPServer::EnableSSL()
+{
+	this->_SSL = true;
+}
+
+void webxlib::HTTPServer::SetSSLCert(std::string cert, std::string key)
+{
+	this->certificate_file		= cert;
+	this->key_file				= key;
+}
+
+bool webxlib::HTTPServer::Start()
+{
+	this->httpsv = new webxlib::csocket(&this->http_data);
+	this->httpssv = new webxlib::csocket(&this->https_data);
+
+	this->_svpower = SVPOWERON;
+
+	httpssv->Bind();
+	httpssv->Listen();
+
+	httpsv->Bind();
+	httpsv->Listen();
+	/*if (httpssv->Bind() != CSOCKET_SUCCESS)
+		csprint("[webxcore] Server boot failed, master secure listening socket failed to Bind\n");
+
+	if (httpssv->Listen() != CSOCKET_SUCCESS)
+		csprint("[webxcore] Server boot failed, master secure listening socket failed to begin Listening\n");
+
+	if (httpsv->Bind() != CSOCKET_SUCCESS)
+		csprint("[webxcore] Server boot failed, master listening socket failed to Bind\n");
+
+	if (httpsv->Listen() != CSOCKET_SUCCESS)
+		csprint("[webxcore] Server boot failed, master listening socket failed to begin Listening\n");*/
+
+	while (this->_svpower == SVPOWERON || this->_svpower == SVPOWERPAUSE)
+	{
+		if (this->_svpower == SVPOWERPAUSE) {
+			continue;
+		}
+
+		if (!this->httpsv->IsValid()) {
+			//csprint("[webxcore] critical error! Server HTTP Listener failed!\n");
+			//csprint("[webxcore] webx attempting to reboot server HTTP listener!\n");
+
+			delete this->httpsv;
+			this->httpsv = new webxlib::csocket(&this->http_data);
+			if (this->httpsv->Bind() == CSOCKET_SUCCESS) {
+				if (this->httpsv->Listen() == CSOCKET_SUCCESS) {
+					//csprint("[webxcore] webx rebooted server HTTP listener!\n");
+				}
+			} else {
+				//csprint("[webxcore] critical error! Server HTTP reboot failed!\n");
+			}
+
+			continue;
+		} else if (!this->httpssv->IsValid()) {
+			//csprint("[webxcore] critical error! Server HTTPS Listener failed!\n");
+			//csprint("[webxcore] webx attempting to reboot server HTTPS listener!\n");
+
+			delete this->httpssv;
+			this->httpssv = new webxlib::csocket(&this->https_data);
+			if (this->httpssv->Bind() == CSOCKET_SUCCESS) {
+				if (this->httpssv->Listen() == CSOCKET_SUCCESS) {
+					//csprint("[webxcore] webx rebooted server HTTPS listener!\n");
+				}
+			} else {
+				//csprint("[webxcore] critical error! Server HTTPS reboot failed!\n");
+			}
+
+			continue;
+		}
+
+		if (this->httpsv->SelectReadable({0,0}) > 0) {
+			webxlib::csocket* client = this->httpsv->Accept();
+
+			if (client->IsValid()) {
+				conpkg inc;
+				inc.sv = this;
+				inc.cl = client;
+
+				CreateThread(NULL, NULL, this->_primaryrequesthandler, (LPVOID)&inc, 0, NULL);
+			} else {
+				delete client;
+
+				continue;
+			}
+		}
+
+		if (this->httpssv->SelectReadable({0,0}) > 0) {
+			webxlib::csocket* client = this->httpsv->Accept();
+			if (client->IsValid()) {
+				client->SSL_Init(this->certificate_file.c_str(), this->key_file.c_str());
+				client->SSLBind();
+
+				if (client->SSLAccept() == CSOCKET_SUCCESS) {
+					conpkg inc;
+					inc.sv = this;
+					inc.cl = client;
+
+					CreateThread(NULL, NULL, this->_primaryrequesthandler, (LPVOID)&inc, 0, NULL);
+				}
+			} else {
+				delete client;
+
+				continue;
+			}
+		}
+
+		break;
+	}
+}
+
+webxlib::HTTPServer* webxlib::HTTPServer::Restart()
+{
+	this->_svpower = SVPOWEROFF;
+
+	auto _newsv = new HTTPServer();
+
+	_newsv->Start();
+
+	return _newsv;
+}
+
+bool webxlib::HTTPServer::Stop()
+{
+	this->_svpower = SVPOWEROFF;
+}
+
+bool webxlib::HTTPServer::Pause()
+{
+	this->_svpower = SVPOWERPAUSE;
+}
+
+void webxlib::HTTPServer::RegisterRequestHandler(std::string id, void* funcptr)
+{
+	this->request_handlers->RegisterWebhook(id, funcptr);
+}
+
+void webxlib::HTTPServer::CallRequestHandler(std::string id, void* arg, void* argg)
+{
+	this->request_handlers->CallWebhook(id, arg, argg);
+}
+
+bool webxlib::HTTPServer::ValidateReqHandler(std::string id)
+{
+	return this->request_handlers->hookIsValid(id);
+}
+
+DWORD WINAPI webxlib::HTTPServer::_primaryrequesthandler(LPVOID _arg)
+{
+	conpkg* _clpkg = (conpkg*)_arg;
+
+	webxlib::csocket* client = (webxlib::csocket*)_clpkg->cl;
+	webxlib::HTTPServer* server = (webxlib::HTTPServer*)_clpkg->sv;
+
+	if (!client->IsValid())
+		return NULL;
+
+	char buff[1501];
+	ZeroMemory(buff, 1501);
+
+	while (int got = client->Recv(buff, 1500)) {
+		if (got == CSOCKET_ERROR || strcmp(buff, "") == 0) {
+			break;
+		}
+
+		cl_data* cl					= new cl_data();
+		cl->cl						= client;
+		cl->request_headers = server->webxif->ParseHTTPRequest(buff);
+
+		if (cl->request_headers["DATA"].substr(1, cl->request_headers["DATA"].size() - 1) == "favicon.ico")
+			break;
+
+		auto cll = cl->request_headers["DATA"].substr(1, cl->request_headers["DATA"].size() - 1);
+
+		if (server->ValidateReqHandler(cll)) {
+			server->CallRequestHandler(cll, (void*)server, (void*)cl);
+		} else {
+			server->CallRequestHandler("INDEX", (void*)server, (void*)cl);
+		}
+	}
+}
+
 
 /********************************************************************
 webxlib class
